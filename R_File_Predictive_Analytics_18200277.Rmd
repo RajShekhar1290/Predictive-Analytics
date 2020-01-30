@@ -1,0 +1,307 @@
+---
+title: "Predicitve_Analytics_Assignmnet"
+author: "Raj Shekhar 18200277"
+date: "11/15/2019"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r EDA1}
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(conf)
+
+#Loading Dublin House Dataset
+House <- read.csv(choose.files(),header = TRUE,row.names = NULL)
+colnames(House)[1]<- "Price"
+#1
+
+#A histogram is an accurate representation of the distribution of numerical data. We can plot the histogram of all numerical variables to understand the normal distribution curve.
+par(mfrow=c(1,2))
+hist(House$Price,xlab="House Price",main="Histogram of House Price",col="lightblue")
+#A box plot is a method for graphically depicting groups of numerical data through their quantiles.
+boxplot(House$Price,ylab="House Price",main="Boxplot of House Price",col="lightgreen")
+
+summary(House)
+```
+
+
+```{r EDA2}
+#2
+
+#Converting Categorial Variables to factor 
+#School:is itself a factor with Levels(Alex High,NotreDame,StLouis,StMarys & Stratford)
+House$Bed <- factor(House$Bed)
+House$Bath <- factor(House$Bath)
+House$Garage <- factor(House$Garage)
+
+#Boxplot 
+par(mfrow=c(2,2))
+
+boxplot(House$Price ~ House$Bed,col="lightblue")
+boxplot(House$Price ~ House$Bath,col="lightgreen")
+boxplot(House$Price ~ House$Garage,col="lightpink")
+boxplot(House$Price ~ House$School,col="lightyellow")
+
+#Summary of 4 categorial variable
+
+House %>%
+  select(Bed,Bath,Garage,School) %>%
+  summary()
+
+#Price summary with each variable
+by(House$Price,House$Bed,summary)
+by(House$Price, House$Bath, summary)
+by(House$Price, House$Garage, summary)
+by(House$Price, House$School, summary)
+
+```
+
+
+```{r EDA3}
+#3
+#Correlations between numerical variable with the Response variable:
+# For our data we can find the correlation between the target variable "price" and the numeric predictor variables.
+
+#Summary
+
+House %>%
+  select(Price,Size,Lot,Year) %>%
+  summary()
+
+#Below codes shows the correlation among these 4 variables and we can see that it is least correlated with correlation coefficient of less than 25%.
+
+House %>%
+  select(Price,Size,Lot,Year) %>%
+  cor()
+
+#Pairs Plot 
+
+my_cols <- c("#00AFBB", "#E7B800", "#FC4E10","#08AFBB", "#E7B810", "#FC4E89")
+
+numerical_var <- data.frame(House$Price,House$Size,House$Lot,House$Year)
+
+panel.cor <- function(x, y){
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- round(cor(x, y), digits=4)
+  txt <- paste0("Cor = ", r)
+  cex.cor <- 1
+  text(0.5, 0.5, txt, cex = cex.cor)
+}
+# Customize upper panel
+upper.panel<-function(x, y){
+  points(x,y, pch = 19, col = my_cols[iris$Species])
+}
+# Create the pair plots with correlation
+pairs(numerical_var[,1:4], 
+      lower.panel = panel.cor,
+      upper.panel = upper.panel)
+
+
+```
+
+
+```{r Regression}
+#Regression Model:
+#1.
+#Model
+#YPrice = Beta0 + Beta1Size + Beta2Lot + Beta3Bath + Beta4Bed + Beta5Year + Beta6Garage + Beta7School + Error
+reg_model=lm(House$Price~(House$Size+House$Lot+House$Bath+House$Bed+House$Year+House$Garage+House$School),data=House)
+
+summary(reg_model)
+
+#Scale size lot and year scale
+
+House$Size<- House$Size - mean(House$Size)
+House$Lot<- House$Lot - mean(House$Lot)
+House$Year<- House$Year - mean(House$Year)
+
+reg_model=lm(House$Price~(House$Size+House$Lot+House$Bath+House$Bed+House$Year+House$Garage+House$School),data=House)
+
+
+summary(reg_model)
+#2. Interpret the estimate of the intercept term : old : -884.3531,new after scale 376.10 
+
+#3. Interpret the estimate of size the parameter associated with floor size : 59.4503
+
+#4. Interpret the estimate of Bath1.1 the parameter associated with one and a half bathrooms.: 135.8983 (highly related to the varaible Price)
+
+#5. Discuss and interpret the effect the predictor variable bed on the expected value of the house prices.
+
+#6. List the predictor variables that are significantly contributing to the ex-pected value of the house prices - 
+val_coef <- summary(reg_model)$coefficients
+subset(val_coef[,'Pr(>|t|)'],val_coef[,'Pr(>|t|)']<0.05)
+
+#7. For each predictor variable what is the value that will lead to the largest expected value of the house prices.
+val_coef[,'Estimate'][1] + val_coef[,'Estimate'][2]*max(House$Size)
+max(House$Size)
+max(House$Lot)
+max(House$Year)
+
+#8. For each predictor variable what is the value that will lead to the lowest expected value of the house prices.
+
+val_coef[,'Estimate'][1] + val_coef[,'Estimate'][2]*min(House$Size)
+
+min(House$Size)
+min(House$Lot)
+min(House$Year)
+
+#9. By looking at the information about the residuals in the summary and by plotting the residuals do you think this is a good model of the expected value of the house prices.:
+
+reg_model %>%
+  predict(interval = "prediction") %>%
+  as.data.frame() -> predict_model
+
+
+plot(predict_model$fit,residuals(reg_model),col="purple")
+points(House$Price,residuals(reg_model),col="green")
+abline(0,0)
+
+#10. Interpret the Adjusted R-squared value.:
+
+#11. Interpret the F-statistic in the output in the summary of the regression model. 
+
+
+```
+
+
+```{r Anova}
+
+#1. Compute the type 1 anova table. Interpret the output. Hint: State the hypothesis being tested, the test statistic and p-value and the conclusion in the context of the problem.
+
+anova(reg_model)
+
+#2. Which predictor variable does the type 1 anova table suggest you should remove the regression analysis.
+#Year
+
+#3. Compute a type 2 anova table comparing the full model with all predictor variables to the the reduced model with the suggested predictor variable identied in the previous question removed.
+
+reg_reduced_model=lm(House$Price~House$Size+House$Lot+House$Bath+House$Bed+House$Garage+House$School,data=House)
+
+anova(reg_model, reg_reduced_model)
+
+```
+
+
+```{r Diagnostics}
+#Diagnostics:
+#1
+library(car)
+library(conf)
+library(corrplot)
+library(Rfit)
+
+avPlots(reg_model)
+
+crPlots(reg_model)
+
+#2
+dwt(reg_model)
+#3
+
+par(mfrow=c(1,1))
+cor_House <- cor(House[,1:7])
+corrplot.mixed(cor_House)
+
+vif(reg_model)
+
+#4
+
+predicted_model <- as.data.frame(predict(reg_model, interval = "prediction"))
+
+plot(predicted_model$fit, resid(reg_model), col="blue")
+abline(0,0)
+
+par(mfrow=c(1,3))
+# Plot of Residual vs Size
+ plot(House$Size, resid(reg_model), col="red")
+ abline(0,0)
+# Plot of Residual vs Lot
+plot(House$Lot, resid(reg_model), col="blue")
+abline(0,0)
+# Plot of Residual vs Year
+ plot(House$Year, resid(reg_model), col="green")
+ abline(0,0)
+
+ par(mfrow=c(2,2))
+# Plot of Residual vs Bath
+ plot(House$Bath, resid(reg_model),xlab="Bath",ylab="Rmodel")
+ abline(0,0)
+# Plot of Residual vs Bed
+plot(House$Bed, resid(reg_model),xlab="Bed",ylab="Rmodel")
+abline(0,0)
+# Plot of Residual vs Garage
+ plot(House$Garage, resid(reg_model),xlab="Garage",ylab="Rmodel")
+ abline(0,0)
+# Plot of Residual vs School
+ plot(House$School, resid(reg_model),xlab="School",ylab="Rmodel")
+ abline(0,0)
+ 
+#5
+r = rstudent(reg_model)
+par(mfrow=c(1,2))
+hist(r,freq=FALSE)
+qqnorm(r)
+qqline(r)
+```
+
+
+```{r Outlier}
+
+library(olsrr)
+library(car)
+#Leverage, Inuence and Outliers:
+#1
+leverage_points <- as.numeric(which(hatvalues(reg_model) > ((2*7)/length(House$Price))))
+leverage_points
+
+leveragePlots(reg_model)
+
+#2
+ols_plot_cooksd_bar(reg_model)
+
+plot(reg_model, which = 6)
+
+plot(reg_model,which = 5)
+
+influencePlot(reg_model)
+
+ols_plot_dfbetas(reg_model)
+
+#3
+
+outlierTest(reg_model)
+ols_plot_cooksd_bar(reg_model)
+ols_plot_resid_lev(reg_model)
+```
+
+
+```{r CI_PI}
+#Expected Value, CI and PI:
+
+#Taking subset for PI and CI
+prediction_model <- predict(reg_model,subset(House,select = -c(Price)),interval="prediction")
+confidence_model <- predict(reg_model,subset(House,select = -c(Price)),interval="confidence")
+
+#Plotting CI PI with points
+ggplot(data=House, aes(House$Price, prediction_model[,1])) + geom_point() + geom_smooth(method=lm) + geom_point(aes(x= House$Price, y=prediction_model[,2]), color="blue") + geom_point(aes(x =House$Price ,y=confidence_model[,3]), color="red")
+
+#Plotting CI PI with lines
+ggplot(data=House, aes(House$Price, prediction_model[,1])) + geom_point() + geom_smooth(method=lm) + geom_line(aes(x= House$Price, y=prediction_model[,2]), color="blue") + geom_line(aes(x =House$Price ,y=confidence_model[,3]), color="red")
+
+#Plot of observed vs fitted value
+ols_plot_obs_fit(reg_model)
+
+
+
+```
+
